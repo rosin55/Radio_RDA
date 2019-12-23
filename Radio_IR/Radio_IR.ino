@@ -11,8 +11,8 @@
 
 #include <newchip.h>
 #include <radio.h>
-#include <RDA5807M.h>
-#include <RDSParser.h>
+#include <RDA5807M.h>  // от Matthias Hertel по адресу https://github.com/mathertel/Radio
+#include <RDSParser.h> // https://github.com/greiman/SSD1306Ascii
 
 #include <avr/pgmspace.h> // константы хранятся в прогр. памяти
 
