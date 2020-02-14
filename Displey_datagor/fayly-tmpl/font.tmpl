@@ -1,0 +1,12 @@
+$(start_block_header)
+#include <stdint.h>
+#include <avr/pgmspace.h>
+$(end_block_header)
+
+const uint$(img_data_block_size)_t image_data_$(doc_name_ws)[] PROGMEM = 
+{$(start_block_images_table)
+$(out_image_data)$(out_comma)
+$(end_block_images_table)
+};
+
+tImage $(doc_name_ws) = {image_data_$(doc_name_ws),$(out_image_width),$(out_image_height)};
