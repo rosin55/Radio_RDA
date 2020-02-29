@@ -23,9 +23,9 @@
 
 #include <SPI.h>
 #include <Wire.h>
-#include "SSD1306Ascii.h"  // библиотека для дисплея SSD1306Ascii (только символьный вывод).
+//#include "SSD1306Ascii.h"  // библиотека для дисплея SSD1306Ascii (только символьный вывод).
 #include "SSD1306AsciiWire.h"
-#define I2C_ADDRESS 0x3C // адрес OLED дисплея
+#define I2C_ADDRESS 0x3C //0x3C // адрес OLED дисплея
 
 SSD1306AsciiWire oled;
 

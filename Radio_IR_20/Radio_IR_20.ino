@@ -1,13 +1,12 @@
 // Скетч для проверки работы RDA5807, дисплея на чипе SSD1306 и ИК пульта от видеокамеры.
 // По нажатию кнопок ищет станции вверх или вниз по диапазону
 //  Начато   29.11.2017
-//  Изменено 02.08.2019
+//  Изменено 19.02.2020
 //  Автор - Сахно А.Д.
 // Radio RD5807М
-//Oled Module SSD1306 128х32 пикселя 
+//Oled Module SSD1306 128х64 пикселя 
 //     SDA —– pin SDA  (pin A4 для Arduino nano V3)
 //     SCL —–  pin SCL (pin A5 для Arduino nano V3)
-// 2-е кнопки pin D2 - поиск вверх, D3 - поиск вниз
 // ИК приемник TSOP4xxx pin D9
 
 //#include <newchip.h>
@@ -18,27 +17,34 @@
 #include <avr/pgmspace.h> // константы хранятся в прогр. памяти
 #include <avr/EEPROM.h> // для хранения параметров
 
-#include <IRremote.h> // библиотека ИК приёмника
-#include <Keys.h>     // Коды кнопок пульта от видеокамеры
+//#include <IRremote.h> // библиотека ИК приёмника
+//#include <Keys.h>     // Коды кнопок пульта от видеокамеры
 
 #include <SPI.h>
 #include <Wire.h>
-#include "SSD1306Ascii.h"  // библиотека для дисплея SSD1306Ascii (только символьный вывод).
+//#include "SSD1306Ascii.h"  // библиотека для дисплея SSD1306Ascii (только символьный вывод).
 #include "SSD1306AsciiWire.h"
-#define I2C_ADDRESS 0x3C // адрес OLED дисплея
+#define I2C_ADDRESS 0x3C //  адрес OLED дисплея
+
+
+#define ledPin 13 // СД на плате Arduino
+#define knUp 2    // кнопка cледующ. станция
+#define knDown 3    // кнопка предыд. станция
+#define  knBassBoost 4 // вкл/выкл усиление басов
+#define  knMode 5    // переключатель режима
+#define  knVolPlus 7 //  громкость больше
+#define  knVolMinus 6 // громкость меньше
+#define  RECV_PIN 9 // контакт подключения ИК-приемника
+#define rstPin 8    // сброс дисплея
+int VolumeLast = 5; // текущая громкость
 
 SSD1306AsciiWire oled;
 
-int ledPin = 13; // СД на плате Arduino
-int knUp = 2;    // кнопка cледующ. станция
-int knDown = 3;    // кнопка предыд. станция
-
-int RECV_PIN = 9; // контакт подключения ИК-приемника
-IRrecv irrecv(RECV_PIN);
-decode_results results;
+//IRrecv irrecv(RECV_PIN);
+//decode_results results;
 
 // Определим несколько станций:
-// 87.50 MHz как 8940
+// 87.50 MHz как 8750
 
 const RADIO_FREQ preset[] PROGMEM = {
   8750, // Бизнес FM
@@ -58,7 +64,8 @@ const RADIO_FREQ preset[] PROGMEM = {
 RADIO_INFO StateInfo; // буфер для приема параметров станции
 int    i_sidx = 11; // Стартуем со станции с index=11
 int DlinaSpiska = (sizeof(preset) / sizeof(RADIO_FREQ)) - 1;// длина списка станций
-unsigned long nextFreqTime = 400; // интервал опроса кнопок и ИК пульта
+unsigned long nextFreqTime = 400; // интервал изменения частоты и ИК пульта
+unsigned long nextVolTime = 1000; // интервал опроса кнопок громкости
 RADIO_FREQ presetf EEMEM = 10470; // частота последней станции перед выключением
 RADIO_FREQ lastf = 0; 
 RADIO_FREQ f = 0;
@@ -68,6 +75,7 @@ uint8_t lastrssi;  // последнее значение уровня сигн�
 RDA5807M radio;    // Создаем класс для  RDA5807 chip radio
 RDSParser rds;     // Класс RDS парсера
 
+
 //*** Мигнуть СД
 void BlinkCD() {
   digitalWrite(ledPin, HIGH);
@@ -75,7 +83,7 @@ void BlinkCD() {
   digitalWrite(ledPin, LOW);
 } // BlinkCD
 
-/// Вывод частоты настройки на Serial и дисплей.
+// Вывод частоты настройки на Serial и дисплей.
 void DisplayFrequency(RADIO_FREQ f)
 {
   char s[12];
@@ -120,7 +128,7 @@ void DisplayServiceName(char *name)
 void RDS_process(uint16_t block1, uint16_t block2, uint16_t block3, uint16_t block4) {
   rds.processData(block1, block2, block3, block4);
 } // RDS_process
-
+/*
 void ReadIR(){
 	if (irrecv.decode(&results))
   {
@@ -165,40 +173,46 @@ void ReadIR(){
 
   }
 } // end ReadIR
-
+*/
 void setup() {
   //*** инициализация пинов kn1, kn2, ledPin
-  pinMode(knUp, INPUT);
-  pinMode(knDown, INPUT);
+  pinMode(knUp, INPUT_PULLUP);
+  pinMode(knDown, INPUT_PULLUP);
+  pinMode(knMode, INPUT_PULLUP);
+  pinMode(knVolPlus, INPUT_PULLUP);
+  pinMode(knVolMinus, INPUT_PULLUP);
+  pinMode(knBassBoost, INPUT_PULLUP);
   pinMode(ledPin, OUTPUT);
+  pinMode(rstPin, OUTPUT);
 
   // open the Serial port
   Serial.begin(9600);
-  Serial.print("Radio...");
+  Serial.println("Radio...");
   delay(500);
 
-  irrecv.enableIRIn(); // включить приемник
+  //irrecv.enableIRIn(); // включить приемник
 
- // initialize with the I2C addr 0x3C (for the 128x32)
-  oled.begin(&Adafruit128x32, I2C_ADDRESS); 
-  oled.setFont(SystemFont5x7);
+ // initialize with the I2C addr 0x3C (for the 128x64)
+  oled.reset(rstPin);
+  oled.begin(&Adafruit128x64, I2C_ADDRESS); 
+  oled.setFont(Verdana12);
+// Initialize the Radio 
+  radio.init();
+  radio.debugEnable();
 
-  delay(100);
+ // delay(100);
   // 
   oled.clear();
-  oled.set2X();
   oled.setCursor(0,0);
   oled.println("Scan station");
   oled.print  (" RDA5807!");
+
   delay(2000);
   oled.clear();
 
-  // Initialize the Radio 
-  radio.init();
   f = radio.getFrequency();
   Serial.println(f);
   // Enable information to the Serial port
-  //radio.debugEnable();
 
   radio.setBandFrequency(RADIO_BAND_FM, pgm_read_word_near(preset + i_sidx)); // 5. preset.
   radio.setFrequency(pgm_read_word_near(preset + i_sidx)); // запись частоты в радиочип
@@ -208,25 +222,56 @@ void setup() {
   radio.setMono(false);
   radio.setMute(false);
   // radio.debugRegisters();
-  radio.setVolume(5);
+  radio.setVolume(VolumeLast); // начальная громкость
   // setup the information chain for RDS data.
   radio.attachReceiveRDS(RDS_process);
   rds.attachServicenNameCallback(DisplayServiceName);
 } // End Setup
-
+/*
+void BtnRead(){
+	unsigned long now = millis();
+	// Проверка нажатия кнопок
+if ( now > nextVolTime) {
+	if (digitalRead(knVolPlus) == LOW){ // громкость больше
+  	  if (VolumeLast < 15) {
+  	  	VolumeLast = VolumeLast + 1;
+  	    radio.setVolume(VolumeLast);
+  	    Serial.print("Громкость: ");
+  	    Serial.println(VolumeLast);
+  	   }
+    }
+    else if (digitalRead(knVolMinus) == LOW){ // громкость меньше
+  	    if (VolumeLast > 0) {
+  	      VolumeLast = VolumeLast - 1;
+  	      radio.setVolume(VolumeLast);
+  	      Serial.print("Громкость: ");
+  	      Serial.println(VolumeLast);
+  	    }
+  	}
+  	else if (digitalRead(knBassBoost) == LOW){
+  		radio.setBassBoost(!radio.getBassBoost());
+  	}
+    
+ nextVolTime = now + 500;
+ }
+} // end BtnRead
+*/
 void loop() {
   unsigned long now = millis();
  
 // Проверка и выполнение команд с ИК пульта
-	ReadIR();
+//	ReadIR();
 
 // Проверка нажатия кнопок
-  if (digitalRead(knUp) == 0){ 
+  if (digitalRead(knUp) == LOW){  // поиск станции вверх
+  	Serial.println("Up"); 
   	radio.seekUp(true);
   }
-  if (digitalRead(knDown) == 0){
+  if (digitalRead(knDown) == LOW){ // поиск станции вниз
+  	Serial.println("Down"); 
   	radio.seekDown(true);
-    }
+  }
+//BtnRead();
 
   // check for RDS data
    radio.checkRDS();
