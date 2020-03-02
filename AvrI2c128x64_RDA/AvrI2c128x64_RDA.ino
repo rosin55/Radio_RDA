@@ -14,6 +14,8 @@
 #define BTN_PIN_DOWN 3 //  кнопка предыд. станция
 #define BTN_PIN_MODE 5 //  переключатель режима
 
+#include <GyverButton.h> // Библиотека работы с кропками от Гайвера
+
 //#include "SSD1306Ascii.h"
 #include <SSD1306AsciiAvrI2c.h>
 #include <radio.h>
@@ -37,6 +39,10 @@ SSD1306AsciiAvrI2c oled;
 RDA5807M radio;    // Создаем класс для  RDA5807 chip radio
 RDSParser rds;     // Класс RDS парсера
 
+GButton knUp(BTN_PIN_UP);
+GButton knDown(BTN_PIN_DOWN);
+GButton knMode(BTN_PIN_MODE);
+
 const RADIO_FREQ preset[] PROGMEM = {
   8750, // Бизнес FM
   8910, // Радио Джаз
@@ -52,7 +58,7 @@ const RADIO_FREQ preset[] PROGMEM = {
  10470, // Радио 7
  10740  // Хит FM
 };
-int    i_sidx = 3; // Стартуем со станции с indexa
+int    i_sidx = 11; // Стартуем со станции с indexa
 int DlinaSpiska = (sizeof(preset) / sizeof(RADIO_FREQ)) - 1;// длина списка станций
 byte Regim = 0; // 0 - поиск, 1 - предустановленные, 2 - громкость +/-
 
@@ -77,18 +83,19 @@ void DisplayServiceName(char *name)
 {
 //  Serial.print("RDS:");
 //  Serial.println(name);
-      oled.setCursor(0,0);
-      oled.print("RDS: ");
-      oled.setCursor(0,2);
-      oled.clearToEOL();
-      oled.print(name);
+  oled.set1X(); 
+  oled.setCursor(0,0);
+  oled.print("R D S : ");
+  oled.clearToEOL();
+  oled.set2X(); 
+  oled.setCursor(0,2);
+  oled.clearToEOL();
+  oled.print(name);
  } // DisplayServiceName()
 
 //####################################################################################
 void setup() {
   pinMode(rstPin, OUTPUT);
-  pinMode(BTN_PIN_UP, INPUT_PULLUP);
-  pinMode(BTN_PIN_DOWN, INPUT_PULLUP);
   Serial.begin(9600); 
   oled.reset(rstPin);
   oled.begin(&Adafruit128x64, I2C_ADDRESS);
@@ -108,9 +115,8 @@ void setup() {
 //  f = eeprom_read_word(StartFrequency);
   Serial.println(pgm_read_word_near(preset + i_sidx));
   radio.setFrequency(pgm_read_word_near(preset + i_sidx)); // запись частоты в радиочип
-  //radio.setFrequency(pgm_read_word_near(preset + i_sidx)); // запись частоты в радиочип
-//  radio.attachReceiveRDS(RDS_process);
-//  rds.attachServicenNameCallback(DisplayServiceName);
+  radio.attachReceiveRDS(RDS_process);
+  rds.attachServicenNameCallback(DisplayServiceName);  // объявление пп печати RDS 
   Serial.println("Request getFrequency");
   f = radio.getFrequency();
   Serial.println(f);
@@ -119,17 +125,20 @@ void setup() {
 } // end setup
 //####################################################################################
 void loop() {
-
   unsigned long now = millis();
-  if (now > nextReadBtn) {
-    if (digitalRead(BTN_PIN_UP) == LOW){ 
+
+  // check for RDS data
+   radio.checkRDS();
+
+  knUp.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
+  knDown.tick();
+    if (knUp.isSingle()){ 
     radio.seekUp(true);
     }
-    if (digitalRead(BTN_PIN_DOWN) == LOW) {
+    if (knDown.isSingle()) {
     radio.seekDown(true); 
     }
-    nextReadBtn = now + 500;
-  }
+ 
     if (now > nextFreqTime) {
       f = radio.getFrequency();
       if (f != lastf) {
