@@ -69,6 +69,11 @@ void DisplayServiceName(char *name)
 {
   Serial.print("RDS:");
   Serial.println(name);
+      oled.setCursor(0,0);
+      oled.print("RDS: ");
+      oled.setCursor(0,2);
+      oled.clearToEOL();
+      oled.print(name);
  } // DisplayServiceName()
 
 void setup() {
@@ -111,6 +116,12 @@ void loop() {
         LastFrequency = f;
         eeprom_update_word(LastFrequency, StartFrequency);
       } // if
+      radio.getRadioInfo(&StateInfo); // читает параметры приема станции
+      r = StateInfo.rssi; // текущий уровень приёма
+      if (r != lastrssi) {
+        DisplayState(); // вывод уровня приёма
+        lastrssi = r;
+
     }
     nextFreqTime = now + 1000;
 }
