@@ -12,7 +12,7 @@
 // кнопка подключена сюда (BTN_PIN --- КНОПКА --- GND)
 #define BTN_PIN_UP 2   //  кнопка cледующ. станция
 #define BTN_PIN_DOWN 3 //  кнопка предыд. станция
-#define BTN_PIN_MODE 5 //  переключатель режима
+#define BTN_PIN_MODE 4 //  переключатель режима
 
 #include <GyverButton.h> // Библиотека работы с кропками от Гайвера
 
@@ -27,15 +27,18 @@
 // 0X3C+SA0 - 0x3C or 0x3D
 #define I2C_ADDRESS 0X3C //0x3C
 #define rstPin 8 // пин RST дисплея
-unsigned long nextFreqTime = 400; // интервал вывода частоты
-unsigned long nextReadBtn = 500; // интервал опроса кнопок и ИК пульта
+unsigned long nextFreqTime = 1000; // интервал вывода частоты
 RADIO_FREQ lastf = 0;
 RADIO_FREQ f = 0;
 uint16_t EEMEM StartFrequency = 10470;  // начальное значение частоты станции, попадает в файл .eep
                     // если дальше в скрипте есть запись ЕЕПРОМ
 uint16_t LastFrequency = 8570;
 
-SSD1306AsciiAvrI2c oled;
+uint8_t r;    // новое значение уровня сигнала
+uint8_t lastrssi;  // последнее значение уровня сигнала
+uint8_t nrReg = 0; // 0 - ручная настройка, 1 - предустановленные частоты, 2 - изменение громкости
+
+SSD1306AsciiAvrI2c oled; // класс дисплея
 RDA5807M radio;    // Создаем класс для  RDA5807 chip radio
 RDSParser rds;     // Класс RDS парсера
 
@@ -58,9 +61,12 @@ const RADIO_FREQ preset[] PROGMEM = {
  10470, // Радио 7
  10740  // Хит FM
 };
+const String regName[] = {
+  "T U N E", "P R E S E T", "V O L U M E",
+};
+RADIO_INFO StateInfo; // буфер для приема параметров станции
 int    i_sidx = 11; // Стартуем со станции с indexa
 int DlinaSpiska = (sizeof(preset) / sizeof(RADIO_FREQ)) - 1;// длина списка станций
-byte Regim = 0; // 0 - поиск, 1 - предустановленные, 2 - громкость +/-
 
 // Вывод частоты настройки на дисплей.
 void DisplayFrequency(RADIO_FREQ f)
@@ -93,6 +99,24 @@ void DisplayServiceName(char *name)
   oled.print(name);
  } // DisplayServiceName()
 
+void DisplayState()
+{
+  radio.getRadioInfo(&StateInfo); // читает параметры приема станции
+  oled.set1X(); 
+  oled.setCursor(69,6);
+  oled.print("R S S I :");
+  oled.setCursor(110,6);
+  oled.print(StateInfo.rssi); // выводит уровень сигнала на дисплей
+} // DisplayState()
+
+void DisplayRegim(uint8_t r)
+{
+  oled.set1X(); 
+  oled.setCursor(0,6);
+  oled.print(regName[r]);
+  oled.clearToEOL();
+}
+
 //####################################################################################
 void setup() {
   pinMode(rstPin, OUTPUT);
@@ -119,9 +143,8 @@ void setup() {
   rds.attachServicenNameCallback(DisplayServiceName);  // объявление пп печати RDS 
   Serial.println("Request getFrequency");
   f = radio.getFrequency();
-  Serial.println(f);
   DisplayFrequency(f);
-  Serial.println("Start loop");
+  DisplayRegim(nrReg);
 } // end setup
 //####################################################################################
 void loop() {
@@ -132,13 +155,20 @@ void loop() {
 
   knUp.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
   knDown.tick();
+  knMode.tick();
     if (knUp.isSingle()){ 
-    radio.seekUp(true);
+      radio.seekUp(true);
     }
     if (knDown.isSingle()) {
-    radio.seekDown(true); 
+      radio.seekDown(true); 
     }
- 
+    if (knMode.isSingle()) {
+      nrReg = nrReg + 1;
+      Serial.println(nrReg);
+      if(nrReg == 3) { nrReg = 0; }
+      DisplayRegim(nrReg); 
+    }
+
     if (now > nextFreqTime) {
       f = radio.getFrequency();
       if (f != lastf) {
@@ -148,6 +178,12 @@ void loop() {
         nextFreqTime = now + 1000;
 
 //        eeprom_update_word(LastFrequency, StartFrequency);
+      } // if
+      radio.getRadioInfo(&StateInfo); // читает параметры приема станции
+      r = StateInfo.rssi; // текущий уровень приёма
+      if (r != lastrssi) {
+        DisplayState(); // вывод уровня приёма если изменилсялся
+        lastrssi = r;
       } // if
     } // if
 } //end loop
