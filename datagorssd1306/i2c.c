@@ -1,0 +1,70 @@
+#include "i2c.h"
+
+void i2c_init(void)
+{
+  SDAPORT&=(1<<SDA);
+  SCLPORT&=(1<<SCL);
+  
+  SOFT_I2C_SDA_HIGH;  
+  SOFT_I2C_SCL_HIGH;  
+}
+
+void i2c_start(void)
+{
+  SOFT_I2C_SCL_HIGH;
+  H_DEL;
+  
+  SOFT_I2C_SDA_LOW; 
+  H_DEL;    
+}
+
+void i2c_stop(void)
+{
+   SOFT_I2C_SDA_LOW;
+   H_DEL;
+   SOFT_I2C_SCL_HIGH;
+   Q_DEL;
+   SOFT_I2C_SDA_HIGH;
+   H_DEL;
+}
+
+uint8_t i2c_write(uint8_t data)
+{
+   uint8_t i;
+    
+   for(i=0;i<8;i++)
+   {
+    SOFT_I2C_SCL_LOW;
+    Q_DEL;
+    
+    if(data & 0x80)
+      SOFT_I2C_SDA_HIGH;
+    else
+      SOFT_I2C_SDA_LOW; 
+    
+    H_DEL;
+    
+    SOFT_I2C_SCL_HIGH;
+    H_DEL;
+    
+    while((SCLPIN & (1<<SCL))==0);
+      
+    data=data<<1;
+  }
+   
+  SOFT_I2C_SCL_LOW;
+  Q_DEL;
+    
+  SOFT_I2C_SDA_HIGH;    
+  H_DEL;
+    
+  SOFT_I2C_SCL_HIGH;
+  H_DEL;  
+  
+  uint8_t ack=!(SDAPIN & (1<<SDA));
+  
+  SOFT_I2C_SCL_LOW;
+  H_DEL;
+  
+  return ack;
+}
