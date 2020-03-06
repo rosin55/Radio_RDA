@@ -17,7 +17,7 @@ uint16_t LastFrequency = 8570;
 #include <radio.h>
 #include <RDA5807M.h>
 #include <RDSParser.h>
-#include <SPI.h>
+//#include <SPI.h>
 #include <Wire.h>
 #include "SSD1306Ascii.h"    // библиотека для дисплея SSD1306Ascii (только символьный вывод).
 #include "SSD1306AsciiWire.h"// https://github.com/greiman/SSD1306Ascii 
