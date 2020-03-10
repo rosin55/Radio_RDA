@@ -32,7 +32,7 @@
 unsigned long now = 0; // текущее время 
 unsigned long nextFreqTime = 1000; // интервал вывода частоты
 unsigned long sleepTime = 0; //  время без нажатия кнопок 
-const unsigned long timeOut =60000;
+const unsigned long timeOut =180000; //   интервал перехода сон в мс
 RADIO_FREQ lastf = 0;
 RADIO_FREQ f = 0;
 uint16_t EEMEM StartFrequency = 10470;  // начальное значение частоты станции, попадает в файл .eep
@@ -94,7 +94,7 @@ void DisplayServiceName(char *name)
 {
   oled.set1X(); 
   oled.setCursor(0,0);
-  oled.print("R D S : ");
+  oled.print("R D S  T E X T: ");
   oled.clearToEOL();
   oled.set2X(); 
   oled.setCursor(0,2);
@@ -157,6 +157,17 @@ void ExecCommand(uint8_t comm)
       default:
         Serial.println("reg unknown");
   }
+} // end ExecCommand
+void DisplayServiceTime(uint8_t hour, uint8_t minute)
+{
+  oled.set1X(); 
+  oled.setCursor(0,0);
+  oled.print("R D S  T I M E : ");
+  oled.clearToEOL();
+  oled.set2X(); 
+  oled.setCursor(0,2);
+  oled.clearToEOL();
+  oled.print(hour); oled.print(" : "); oled.print(minute);
 }
 //####################################################################################
 void setup() {
@@ -177,6 +188,7 @@ void setup() {
   radio.setFrequency(pgm_read_word_near(preset + i_sidx)); // запись частоты в радиочип
   radio.attachReceiveRDS(RDS_process);
   rds.attachServicenNameCallback(DisplayServiceName);  // объявление пп печати RDS 
+  rds.attachTimeCallback(DisplayServiceTime); // объявление пп печати времени
   f = radio.getFrequency();
   DisplayFrequency(f);
   DisplayRegim(nrReg);
