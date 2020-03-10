@@ -1,5 +1,5 @@
 //  Версия с 3-мя кнопками и 3-мя режимами
-#define ver   "2020.03.06" 
+#define ver   "2020.03.10" 
 
 /* Добавляем управление с кнопок от AG
   Подключение дисплея SSD1306 I2C:
@@ -26,10 +26,12 @@
 
 #include <avr/pgmspace.h> // константы хранятся в прогр. памяти
 
-// 0X3C+SA0 - 0x3C or 0x3D
 #define I2C_ADDRESS 0X3C //0x3C
 #define rstPin 8 // пин RST дисплея
+unsigned long now = 0; // текущее время 
 unsigned long nextFreqTime = 1000; // интервал вывода частоты
+unsigned long sleepTime = 0; //  время без нажатия кнопок 
+const unsigned long timeOut =60000;
 RADIO_FREQ lastf = 0;
 RADIO_FREQ f = 0;
 uint16_t EEMEM StartFrequency = 10470;  // начальное значение частоты станции, попадает в файл .eep
@@ -128,6 +130,7 @@ void DisplayIntro() {
 
 void ExecCommand(uint8_t comm)
 {
+  sleepTime = now; // обнуление счетчика сна
   switch ( nrReg ) {
       case 0: {        // плавная настройка
         if (comm == 1) radio.seekUp(true);
@@ -179,7 +182,7 @@ void setup() {
 } // end setup
 //####################################################################################
 void loop() {
-  unsigned long now = millis();
+  now = millis();
 
   // check for RDS data
   radio.checkRDS();
@@ -187,10 +190,12 @@ void loop() {
   knUp.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
   knDown.tick();
   knMode.tick();
+  if ((now - sleepTime) > timeOut) { oled.clear(); }
     if (knMode.isSingle()) {
       nrReg = nrReg + 1;
       if(nrReg == 3) { nrReg = 0; }
-      DisplayRegim(nrReg); 
+      DisplayRegim(nrReg);
+      sleepTime = now; 
     }
     if (knUp.isSingle()){ 
       ExecCommand(1);
