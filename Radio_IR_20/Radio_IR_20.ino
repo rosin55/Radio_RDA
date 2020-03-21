@@ -1,6 +1,6 @@
 //  Версия с 3-мя кнопками, 3-мя режимами
 //  очитска дисплея через 1-у мин.
-#define ver   "2020.03.10" 
+#define ver   "2020.03.20" 
 
 /* Добавляем управление с кнопок от AG
   Подключение дисплея SSD1306 I2C:
@@ -43,6 +43,7 @@ uint8_t r;    // новое значение уровня сигнала
 uint8_t lastrssi;  // последнее значение уровня сигнала
 uint8_t nrReg = 0; // 0 - ручная настройка, 1 - предустановленные частоты, 2 - изменение громкости
 uint8_t napravlenie = 1; //1 - вверх, -1 - вниз  
+uint16_t volume = 5;     // текущий уровень громкости
 
 SSD1306AsciiAvrI2c oled; // класс дисплея
 RDA5807M radio;    // Создаем класс для  RDA5807 chip radio
@@ -114,10 +115,10 @@ void DisplayState()
 
 void DisplayRegim(uint8_t r)
 {
-  oled.set1X(); 
+  oled.set1X();
+//  oled.setCursor(0,0); oled.clearToEOL(); 
   oled.setCursor(0,6);
-  oled.print(regName[r]);
-  oled.clearToEOL();
+  oled.print(regName[r]); oled.clearToEOL();
 } // end DisplayRegim
 
 void DisplayIntro() {
@@ -128,6 +129,14 @@ void DisplayIntro() {
   oled.print("RDA5807M");
   delay(2000);
 } // end DisplayIntro
+
+void DisplayVolume() {
+  oled.setCursor(0,0); oled.clearToEOL();
+  oled.set2X(); 
+  oled.setCursor(0,2);
+  oled.print(volume); oled.clearToEOL();
+  DisplayRegim(nrReg);
+} // end DisplayVolume
 
 void ExecCommand(uint8_t comm)
 {
@@ -151,13 +160,24 @@ void ExecCommand(uint8_t comm)
         }
       }
         break;
-      case 2:         // рагулировка громкости
-        Serial.println("reg 3");
+      case 2: {        // рагулировка громкости
+        if (comm == 1) {
+          if (volume < 16) volume++;
+          else volume = 16;
+        }
+        else {
+          if (volume > 0) volume--;
+          else volume = 0;
+        }
+        DisplayVolume();
+        radio.setVolume(volume);
+      }
         break;
       default:
         Serial.println("reg unknown");
   }
 } // end ExecCommand
+
 void DisplayServiceTime(uint8_t hour, uint8_t minute)
 {
   oled.set1X(); 
@@ -198,12 +218,12 @@ void loop() {
   now = millis();
 
   // check for RDS data
-  radio.checkRDS();
+  if (nrReg != 2) radio.checkRDS(); // для всех кроме громкости
 
   knUp.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
   knDown.tick();
   knMode.tick();
-  if ((now - sleepTime) > timeOut) { oled.clear(); }
+  if ((now - sleepTime) > timeOut) { oled.clear(); } // гашение дисплея
     if (knMode.isSingle()) {
       nrReg = nrReg + 1;
       if(nrReg == 3) { nrReg = 0; }
@@ -219,7 +239,7 @@ void loop() {
     
     if (now > nextFreqTime) {
       f = radio.getFrequency();
-      if (f != lastf) {
+      if ((f != lastf) and (nrReg != 2)) {
         Serial.println(f);  // вывод новой частоты настройки
         DisplayFrequency(f);
         lastf = f;
@@ -229,7 +249,7 @@ void loop() {
       } // if
       radio.getRadioInfo(&StateInfo); // читает параметры приема станции
       r = StateInfo.rssi; // текущий уровень приёма
-      if (r != lastrssi) {
+      if ((r != lastrssi) and (nrReg != 2)) {
         DisplayState(); // вывод уровня приёма если изменилсялся
         lastrssi = r;
       } // if
