@@ -81,7 +81,7 @@ void DisplayFrequency(RADIO_FREQ f)
   radio.formatFrequency(s, sizeof(s));
   oled.set1X(); 
   oled.setCursor(0,0);
-  oled.println("F R E Q U E N C Y");
+  oled.println("F R E Q U E N C Y   ");
   oled.set2X();
   oled.print(s); oled.clearToEOL();
 } // DisplayFrequency()
@@ -123,18 +123,27 @@ void DisplayRegim(uint8_t r)
 
 void DisplayIntro() {
   oled.set1X();
-    oled.print("Ver : "); oled.print(ver);
-  oled.set2X();
+  oled.setFont(Verdana12);
+  oled.print("Ver : "); oled.print(ver);
+  oled.setFont(Roosewood26);
   oled.setCursor(0,2);
   oled.print("RDA5807M");
   delay(2000);
+  oled.setFont(Verdana12);
+  oled.set1X();
 } // end DisplayIntro
 
 void DisplayVolume() {
+  String bar  = "----------------";
+  int i =0;
   oled.setCursor(0,0); oled.clearToEOL();
-  oled.set2X(); 
-  oled.setCursor(0,2);
-  oled.print(volume); oled.clearToEOL();
+  oled.setFont(X11fixed7x14);
+  for (i; i<volume; i++){
+    bar.setCharAt(i, char(0x7f));
+  }
+  oled.setCursor(0,0); oled.print(bar);
+  oled.setCursor(112,0); oled.print(volume); // oled.clearToEOL();
+  oled.setFont(Verdana12);
   DisplayRegim(nrReg);
 } // end DisplayVolume
 
@@ -208,7 +217,7 @@ void setup() {
   radio.setFrequency(pgm_read_word_near(preset + i_sidx)); // запись частоты в радиочип
   radio.attachReceiveRDS(RDS_process);
   rds.attachServicenNameCallback(DisplayServiceName);  // объявление пп печати RDS 
-  rds.attachTimeCallback(DisplayServiceTime); // объявление пп печати времени
+//  rds.attachTimeCallback(DisplayServiceTime); // объявление пп печати времени
   f = radio.getFrequency();
   DisplayFrequency(f);
   DisplayRegim(nrReg);
