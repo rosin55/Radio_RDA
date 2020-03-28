@@ -1,6 +1,6 @@
 //  Версия с 3-мя кнопками, 3-мя режимами
 //  очитска дисплея через 1-у мин.
-#define ver   "2020.03.20" 
+#define ver   "2020.03.28" 
 
 /* Добавляем управление с кнопок от AG
   Подключение дисплея SSD1306 I2C:
@@ -17,22 +17,23 @@
 #define BTN_PIN_DOWN 3 //  кнопка предыд. станция
 #define BTN_PIN_MODE 4 //  переключатель режима
 
-#include <GyverButton.h> // Библиотека работы с кропками от Гайвера
+#include <GyverButton.h> // Библиотека работы с кнопками от Гайвера
 
-//#include "SSD1306Ascii.h"
+#include "SSD1306Ascii.h"
 #include <SSD1306AsciiAvrI2c.h>
 #include <radio.h>
 #include <RDA5807M.h>
 #include <RDSParser.h>
 
 #include <avr/pgmspace.h> // константы хранятся в прогр. памяти
+#include <avr/eeprom.h>   // параметры хранятся в эн.незав. памяти
 
 #define I2C_ADDRESS 0X3C //0x3C
 #define rstPin 8 // пин RST дисплея
 unsigned long now = 0; // текущее время 
 unsigned long nextFreqTime = 1000; // интервал вывода частоты
 unsigned long sleepTime = 0; //  время без нажатия кнопок 
-const unsigned long timeOut =180000; //   интервал перехода сон в мс
+const unsigned long timeOut = 10000 ; //180000; //   интервал перехода сон в мс
 RADIO_FREQ lastf = 0;
 RADIO_FREQ f = 0;
 uint16_t EEMEM StartFrequency = 10470;  // начальное значение частоты станции, попадает в файл .eep
@@ -69,7 +70,7 @@ const RADIO_FREQ preset[] PROGMEM = {
  10740  // Хит FM
 };
 const String regName[] = {
-  "T U N E", "P R E S E T", "V O L U M E",
+  "T U N E", "P R E S E T", "V O L U M E", "S L E E P"
 };
 RADIO_INFO StateInfo; // буфер для приема параметров станции
 int    i_sidx = 11; // Стартуем со станции с indexa
@@ -212,9 +213,7 @@ void setup() {
   radio.init();
   radio.debugEnable();
   radio.setBandFrequency(RADIO_BAND_FM, pgm_read_word_near(preset + i_sidx));// включение диапазона частот 
-//  f = eeprom_read_word(StartFrequency);
-  Serial.println(pgm_read_word_near(preset + i_sidx));
-  radio.setFrequency(pgm_read_word_near(preset + i_sidx)); // запись частоты в радиочип
+  radio.setFrequency(eeprom_read_word(&StartFrequency)); // чтение частоты из ЕЕПРОМ и запись в радиочип 
   radio.attachReceiveRDS(RDS_process);
   rds.attachServicenNameCallback(DisplayServiceName);  // объявление пп печати RDS 
 //  rds.attachTimeCallback(DisplayServiceTime); // объявление пп печати времени
@@ -232,10 +231,15 @@ void loop() {
   knUp.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
   knDown.tick();
   knMode.tick();
-  if ((now - sleepTime) > timeOut) { oled.clear(); } // гашение дисплея
+  if (((now - sleepTime) > timeOut) and (nrReg != 3)){ // гашение дисплея и запоминание параметров
+    oled.clear();
+    nrReg = 3;     // режим сна 
+    eeprom_update_word(&StartFrequency, lastf ); // запоминаем посл. частоту
+    Serial.print("DataFR: "); Serial.println(eeprom_read_word(&StartFrequency));
+  } 
     if (knMode.isSingle()) {
       nrReg = nrReg + 1;
-      if(nrReg == 3) { nrReg = 0; }
+      if(nrReg == 4) { nrReg = 0; }
       DisplayRegim(nrReg);
       sleepTime = now; 
     }
@@ -253,13 +257,11 @@ void loop() {
         DisplayFrequency(f);
         lastf = f;
         nextFreqTime = now + 1000;
-
-//        eeprom_update_word(LastFrequency, StartFrequency);
       } // if
       radio.getRadioInfo(&StateInfo); // читает параметры приема станции
       r = StateInfo.rssi; // текущий уровень приёма
       if ((r != lastrssi) and (nrReg != 2)) {
-        DisplayState(); // вывод уровня приёма если изменилсялся
+        DisplayState(); // вывод уровня приёма если изменился
         lastrssi = r;
       } // if
     } // if
