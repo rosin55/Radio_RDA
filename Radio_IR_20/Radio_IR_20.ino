@@ -28,23 +28,22 @@
 #include <avr/pgmspace.h> // константы хранятся в прогр. памяти
 #include <avr/eeprom.h>   // параметры хранятся в эн.незав. памяти
 
-#define I2C_ADDRESS 0X3C //0x3C
+#define I2C_ADDRESS 0X3C //0x3C адрес дисплея на шине I2C
 #define rstPin 8 // пин RST дисплея
 unsigned long now = 0; // текущее время 
 unsigned long nextFreqTime = 1000; // интервал вывода частоты
 unsigned long sleepTime = 0; //  время без нажатия кнопок 
-const unsigned long timeOut = 10000 ; //180000; //   интервал перехода сон в мс
+const unsigned long timeOut = 180000 ; // 10000//   интервал перехода сон в мс
 RADIO_FREQ lastf = 0;
 RADIO_FREQ f = 0;
 uint16_t EEMEM StartFrequency = 10470;  // начальное значение частоты станции, попадает в файл .eep
-                    // если дальше в скрипте есть запись ЕЕПРОМ
-uint16_t LastFrequency = 8570;
+uint8_t EEMEM StartVolume = 8;         // начальное значение громкости
+uint8_t volume = 7;     // текущий уровень громкости
 
 uint8_t r;    // новое значение уровня сигнала
 uint8_t lastrssi;  // последнее значение уровня сигнала
 uint8_t nrReg = 0; // 0 - ручная настройка, 1 - предустановленные частоты, 2 - изменение громкости
 uint8_t napravlenie = 1; //1 - вверх, -1 - вниз  
-uint16_t volume = 5;     // текущий уровень громкости
 
 SSD1306AsciiAvrI2c oled; // класс дисплея
 RDA5807M radio;    // Создаем класс для  RDA5807 chip radio
@@ -170,7 +169,7 @@ void ExecCommand(uint8_t comm)
         }
       }
         break;
-      case 2: {        // рагулировка громкости
+      case 2: {        // регулировка громкости
         if (comm == 1) {
           if (volume < 16) volume++;
           else volume = 16;
@@ -214,6 +213,7 @@ void setup() {
   radio.debugEnable();
   radio.setBandFrequency(RADIO_BAND_FM, pgm_read_word_near(preset + i_sidx));// включение диапазона частот 
   radio.setFrequency(eeprom_read_word(&StartFrequency)); // чтение частоты из ЕЕПРОМ и запись в радиочип 
+  radio.setVolume(eeprom_read_byte(&StartVolume));       // чтение громкости из ЕЕПРОМ и запись в радиочип
   radio.attachReceiveRDS(RDS_process);
   rds.attachServicenNameCallback(DisplayServiceName);  // объявление пп печати RDS 
 //  rds.attachTimeCallback(DisplayServiceTime); // объявление пп печати времени
@@ -226,7 +226,7 @@ void loop() {
   now = millis();
 
   // check for RDS data
-  if (nrReg != 2) radio.checkRDS(); // для всех кроме громкости
+  if ((nrReg != 3) and (nrReg != 2)) radio.checkRDS(); // для всех кроме сна и громкости
 
   knUp.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
   knDown.tick();
@@ -235,6 +235,7 @@ void loop() {
     oled.clear();
     nrReg = 3;     // режим сна 
     eeprom_update_word(&StartFrequency, lastf ); // запоминаем посл. частоту
+    eeprom_update_byte(&StartVolume, volume);    // запомнить громкость
     Serial.print("DataFR: "); Serial.println(eeprom_read_word(&StartFrequency));
   } 
     if (knMode.isSingle()) {
@@ -260,7 +261,7 @@ void loop() {
       } // if
       radio.getRadioInfo(&StateInfo); // читает параметры приема станции
       r = StateInfo.rssi; // текущий уровень приёма
-      if ((r != lastrssi) and (nrReg != 2)) {
+      if ((r != lastrssi) and (nrReg != 3)) {
         DisplayState(); // вывод уровня приёма если изменился
         lastrssi = r;
       } // if
