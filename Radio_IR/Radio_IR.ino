@@ -17,7 +17,7 @@
 #include <avr/pgmspace.h> // константы хранятся в прогр. памяти
 
 #include <IRremote.h> // библиотека ИК приёмника
-#include <Keys.h>     // Коды кнопок пульта от видеокамеры
+#include <Key_CarMp3.h>     // Коды кнопок пульта от видеокамеры
 
 #include <SPI.h>
 #include <Wire.h>
@@ -107,27 +107,27 @@ void RDS_process(uint16_t block1, uint16_t block2, uint16_t block3, uint16_t blo
 void ReadIR(){
 	if (irrecv.decode(&results))
   {
-	if (results.value == W) 
+	if (results.value == knPlus) 
 	{ Serial.println("Нажато W");
 	  if(radio.getVolume() > 1){    
 	  radio.setVolume(radio.getVolume()-1);
 	  }
 	}
-	if (results.value == T) 
+	if (results.value == knMinus) 
 	{ Serial.println("Нажато T");
 	  if(radio.getVolume() < 15){
 	  radio.setVolume(radio.getVolume()+1);	
 	  }
 	}
-	if (results.value == SearchDown) 
+	if (results.value == knEQ ) 
 	{ Serial.println("Нажата кнопка поиск вниз");
 //      здесь вызов процедуры поиска вниз
   }
-	if (results.value == SearchUp) 
+	if (results.value == knEQ ) 
 	{ Serial.println("Нажата кнопка поиск вверх");
  //     здесь вызов процедуры поиска вверх   
   }
-	if (results.value == SkipDown) 
+	if (results.value == knEQ ) 
 	{ Serial.println("Нажато к предыдущей станции");
         if (i_sidx > 0) {             // проверка на нижнюю границу списка станций
       i_sidx--;
@@ -135,7 +135,7 @@ void ReadIR(){
     else i_sidx = DlinaSpiska; // перейти в конец списка
     radio.setFrequency(pgm_read_word_near(preset + i_sidx)); // запись частоты в радиочип
     }
-	if (results.value == SkipUp) 
+	if (results.value == knEQ ) 
 	{ Serial.println("Нажато к следующей станции");
        if (i_sidx < DlinaSpiska) { // проверка на верхнюю границу списка станций
       i_sidx++;
