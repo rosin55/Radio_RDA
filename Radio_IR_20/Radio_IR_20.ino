@@ -1,7 +1,7 @@
 //  Версия с 3-мя кнопками, 3-мя режимами
 //  очистка дисплея через 3-и мин.
 //  Дополнительно ИК упрравление с пульта Car MP3
-#define ver   "2020.04.03" 
+#define ver   "2020.04.06" 
 
 /* Добавляем управление с кнопок от AG
 	Подключение дисплея SSD1306 I2C:
@@ -37,17 +37,21 @@
 unsigned long now = 0; // текущее время 
 unsigned long nextFreqTime = 1000; // интервал вывода частоты
 unsigned long sleepTime = 0; //  время без нажатия кнопок 
-const unsigned long timeOut = 180000 ; // 10000//   интервал перехода сон в мс
+const unsigned long timeOut = 60000; //180000 ; // 10000//   интервал перехода сон в мс
 RADIO_FREQ lastf = 0;
 RADIO_FREQ f = 0;
 RADIO_INFO StateInfo; // буфер для приема параметров станции
-uint16_t EEMEM StartFrequency = 10470;  // начальное значение частоты станции, попадает в файл .eep
-uint8_t EEMEM StartVolume = 8;         // начальное значение громкости
+uint16_t EEMEM StartFrequency = 10470;  // стартовая частота станции, попадает в файл .eep
+uint8_t EEMEM StartVolume = 8;         // стартовая громкость
+uint8_t EEMEM StartnrReg = 0;		// стартовый режим
+uint8_t EEMEM Starti_sidx =0;		// стартовое знач. указателя преднастройки частоты
+
 uint8_t volume = 7;     // текущий уровень громкости
 
 uint8_t r;    // новое значение уровня сигнала
 uint8_t lastrssi;  // последнее значение уровня сигнала
-uint8_t nrReg = 0; // 0 - ручная настройка, 1 - предустановленные частоты, 2 - изменение громкости
+uint8_t nrReg = 0; 	// 0 - ручная настройка, 1 - предустановленные частоты
+										// 2 - изменение громкости, 3 - сон
 uint8_t napravlenie = 1; //1 - вверх, -1 - вниз  
 int RECV_PIN = 9;     //  пин ИК приёмника 
 
@@ -72,15 +76,15 @@ const RADIO_FREQ preset[] PROGMEM = {
 	9560, // Радио Звезда
 	9600, // Дорожное Радио 
 	9640, // Такси FM
- 10500, // Радио книга
  10340, // Радио Маяк
+ 10500, // Радио книга
  10470, // Радио 7
  10740  // Хит FM
 };
 const String regName[] = {
 	"T U N E", "P R E S E T", "V O L U M E", "S L E E P"
 };
-int    i_sidx = 11; // Стартуем со станции с indexa
+int  i_sidx = 11; // Стартуем со станции с indexa
 int DlinaSpiska = (sizeof(preset) / sizeof(RADIO_FREQ)) - 1;// длина списка станций
 // Вывод частоты настройки на дисплей.
 void DisplayFrequency(RADIO_FREQ f)
@@ -244,7 +248,9 @@ void setup() {
 
 	radio.init();
 	radio.debugEnable();
-	radio.setBandFrequency(RADIO_BAND_FM, pgm_read_word_near(preset + i_sidx));// включение диапазона частот 
+	i_sidx = eeprom_read_byte(&Starti_sidx);
+	nrReg = eeprom_read_byte(&StartnrReg);
+	radio.setBand(RADIO_BAND_FM);						// задание диапазона частот
 	radio.setFrequency(eeprom_read_word(&StartFrequency)); // чтение частоты из ЕЕПРОМ и запись в радиочип 
 	volume = eeprom_read_byte(&StartVolume); // чтение громкости из ЕЕПРОМ
 	radio.setVolume(volume);                //  и запись в радиочип
@@ -260,23 +266,24 @@ void loop() {
 	now = millis();
 
 	ReadIR();	// check for RDS data
-	if ((nrReg != 3) and (nrReg != 2)) radio.checkRDS(); // для всех кроме сна и громкости
+	if ((nrReg != 3) and (nrReg != 2)) radio.checkRDS(); // для всех кроме сна и громкости 
 
 	knUp.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
 	knDown.tick();
 	knMode.tick();
 	if (((now - sleepTime) > timeOut) and (nrReg != 3)){ // гашение дисплея и запоминание параметров
 		oled.clear();
-		nrReg = 3;     // режим сна 
 		eeprom_update_word(&StartFrequency, lastf ); // запоминаем посл. частоту
 		eeprom_update_byte(&StartVolume, volume);    // запомнить громкость
-//		Serial.print("DataFR: "); Serial.println(eeprom_read_word(&StartFrequency));
+		eeprom_update_byte(&StartnrReg, nrReg);			// запомнить режим
+		eeprom_update_byte(&Starti_sidx, i_sidx);		// запомнить указатель преднастройки
+		nrReg = 3;     // режим сна 
 	} 
 		if (knMode.isSingle()) {
-			Serial.print("Кномка Режим");
 			nrReg = nrReg + 1;
 			if(nrReg == 4) { nrReg = 0; }
 			DisplayRegim(nrReg);
+			DisplayFrequency(f);
 			sleepTime = now; 
 		}
 		if (knUp.isSingle()){ 
@@ -289,7 +296,6 @@ void loop() {
 		if (now > nextFreqTime) {
 			f = radio.getFrequency();
 			if ((f != lastf) and (nrReg != 2)) {
-//				Serial.println(f);  // вывод новой частоты настройки
 				DisplayFrequency(f);
 				lastf = f;
 				nextFreqTime = now + 1000;
