@@ -55,6 +55,7 @@ uint8_t nrReg = 0; 	// 0 - ручная настройка, 1 - предуста
 uint8_t napravlenie = 1; //1 - вверх, -1 - вниз  
 int RECV_PIN = 9;     //  пин ИК приёмника
 int BLINK_PIN = 13;		// индикация приёма коменд от пульта 
+bool flSleep = false; // состояние сна
 
 SSD1306AsciiAvrI2c oled; // класс дисплея
 RDA5807M radio;    // Создаем класс для  RDA5807 chip radio
@@ -111,10 +112,16 @@ void ReadIR(){
 		if ( results.value == knPlus ) { ExecCommand(1); }
 		if ( results.value == knMinus) { ExecCommand(-1);}
 		if ( results.value == knEQ) {
-			nrReg = nrReg + 1;
-			if(nrReg == 4) { nrReg = 0; }
-			DisplayRegim(nrReg);
-			sleepTime = now; 
+			if (flSleep) {
+				RestoreParam();
+				flSleep = false;					// выход изи состояния сна
+			}
+			else{
+				nrReg = nrReg + 1;
+				if(nrReg == 4) { nrReg = 0; }
+				DisplayRegim(nrReg);
+				sleepTime = now;
+			} 
 		}
 		delay(500);
 		irrecv.resume(); // получить следующее значение
@@ -235,8 +242,17 @@ void DisplayServiceTime(uint8_t hour, uint8_t minute)
 	oled.setCursor(0,2);
 	oled.clearToEOL();
 	oled.print(hour); oled.print(" : "); oled.print(minute);
-}
+} // end DisplayServiceTime
+
+void RestoreParam(){
+	lastf = eeprom_read_word(&StartFrequency);
+	volume = eeprom_read_byte(&StartVolume);
+	nrReg = eeprom_read_byte(&StartnrReg);
+	i_sidx = eeprom_read_byte(&Starti_sidx);
+} // end RestoreParam
+
 //####################################################################################
+
 void setup() {
 	pinMode(rstPin, OUTPUT);
 	Serial.begin(9600);
@@ -267,8 +283,8 @@ void setup() {
 void loop() {
 	now = millis();
 
-	ReadIR();	// check for RDS data
-	if ((nrReg != 3) and (nrReg != 2)) radio.checkRDS(); // для всех кроме сна и громкости 
+	ReadIR();	// ролучение и выполненеие ИК команд
+	if ((nrReg != 3) and (nrReg != 2)) radio.checkRDS(); // для всех кроме сна и громкости check for RDS data
 
 	knUp.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
 	knDown.tick();
@@ -279,14 +295,12 @@ void loop() {
 		eeprom_update_byte(&StartVolume, volume);    // запомнить громкость
 		eeprom_update_byte(&StartnrReg, nrReg);			// запомнить режим
 		eeprom_update_byte(&Starti_sidx, i_sidx);		// запомнить указатель преднастройки
-		nrReg = 3;     // режим сна 
+		flSleep = true;     // состояние сна 
 	} 
 		if (knMode.isSingle()) {
-			if (nrReg == 3) {												// выход из сна
-				lastf = eeprom_read_word(&StartFrequency);
-				volume = eeprom_read_byte(&StartVolume);
-				nrReg = eeprom_read_byte(&StartnrReg);
-				i_sidx = eeprom_read_byte(&Starti_sidx);
+			if (flSleep) {
+				RestoreParam();
+				flSleep = false;											// выход из сна
 			}
 			else {
 				nrReg = nrReg + 1;
