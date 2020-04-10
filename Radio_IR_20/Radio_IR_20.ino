@@ -1,7 +1,7 @@
 //  Версия с 3-мя кнопками, 3-мя режимами
 //  очистка дисплея через 3-и мин.
 //  Дополнительно ИК упрравление с пульта Car MP3
-#define ver   "2020.04.06" 
+#define ver   "2020.04.10" 
 
 /* Добавляем управление с кнопок от AG
 	Подключение дисплея SSD1306 I2C:
@@ -53,7 +53,8 @@ uint8_t lastrssi;  // последнее значение уровня сигн�
 uint8_t nrReg = 0; 	// 0 - ручная настройка, 1 - предустановленные частоты
 										// 2 - изменение громкости, 3 - сон
 uint8_t napravlenie = 1; //1 - вверх, -1 - вниз  
-int RECV_PIN = 9;     //  пин ИК приёмника 
+int RECV_PIN = 9;     //  пин ИК приёмника
+int BLINK_PIN = 13;		// индикация приёма коменд от пульта 
 
 SSD1306AsciiAvrI2c oled; // класс дисплея
 RDA5807M radio;    // Создаем класс для  RDA5807 chip radio
@@ -63,11 +64,12 @@ GButton knUp(BTN_PIN_UP);
 GButton knDown(BTN_PIN_DOWN);
 GButton knMode(BTN_PIN_MODE);
 
-IRrecv irrecv(RECV_PIN);
+IRrecv irrecv(RECV_PIN, BLINK_PIN);
 decode_results results;
 
 const RADIO_FREQ preset[] PROGMEM = {
 	8750, // Бизнес FM
+	8830,	// Ретро ФМ
 	8910, // Радио Джаз
 	9030, // Авторадио
 	9080, // Релакс FM
@@ -280,11 +282,19 @@ void loop() {
 		nrReg = 3;     // режим сна 
 	} 
 		if (knMode.isSingle()) {
-			nrReg = nrReg + 1;
-			if(nrReg == 4) { nrReg = 0; }
-			DisplayRegim(nrReg);
-			DisplayFrequency(f);
-			sleepTime = now; 
+			if (nrReg == 3) {												// выход из сна
+				lastf = eeprom_read_word(&StartFrequency);
+				volume = eeprom_read_byte(&StartVolume);
+				nrReg = eeprom_read_byte(&StartnrReg);
+				i_sidx = eeprom_read_byte(&Starti_sidx);
+			}
+			else {
+				nrReg = nrReg + 1;
+				if(nrReg == 4) { nrReg = 0; }
+				DisplayRegim(nrReg);
+				DisplayFrequency(f);
+				sleepTime = now;
+			} 
 		}
 		if (knUp.isSingle()){ 
 			ExecCommand(1);
