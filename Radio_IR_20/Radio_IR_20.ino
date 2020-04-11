@@ -1,7 +1,7 @@
 //  Версия с 3-мя кнопками, 3-мя режимами
 //  очистка дисплея через 3-и мин.
 //  Дополнительно ИК упрравление с пульта Car MP3
-#define ver   "2020.04.10" 
+#define ver   "2020.04.11" 
 
 /* Добавляем управление с кнопок от AG
 	Подключение дисплея SSD1306 I2C:
@@ -85,7 +85,7 @@ const RADIO_FREQ preset[] PROGMEM = {
  10740  // Хит FM
 };
 const String regName[] = {
-	"T U N E", "P R E S E T", "V O L U M E", "S L E E P"
+	"T U N E", "P R E S E T", "V O L U M E"
 };
 int  i_sidx = 11; // Стартуем со станции с indexa
 int DlinaSpiska = (sizeof(preset) / sizeof(RADIO_FREQ)) - 1;// длина списка станций
@@ -112,15 +112,17 @@ void ReadIR(){
 		if ( results.value == knPlus ) { ExecCommand(1); }
 		if ( results.value == knMinus) { ExecCommand(-1);}
 		if ( results.value == knEQ) {
+			sleepTime = now;
 			if (flSleep) {
 				RestoreParam();
+				DisplayFrequency(f);
+				DisplayRegim(nrReg);
 				flSleep = false;					// выход изи состояния сна
 			}
 			else{
 				nrReg = nrReg + 1;
-				if(nrReg == 4) { nrReg = 0; }
+				if(nrReg == 3) { nrReg = 0; }
 				DisplayRegim(nrReg);
-				sleepTime = now;
 			} 
 		}
 		delay(500);
@@ -298,13 +300,16 @@ void loop() {
 		flSleep = true;     // состояние сна 
 	} 
 		if (knMode.isSingle()) {
-			if (flSleep) {
+			if (flSleep) {											// выход из сна
 				RestoreParam();
-				flSleep = false;											// выход из сна
+				DisplayFrequency(f);
+				DisplayRegim(nrReg);
+				sleepTime = now;
+				flSleep = false;
 			}
 			else {
 				nrReg = nrReg + 1;
-				if(nrReg == 4) { nrReg = 0; }
+				if(nrReg == 3) { nrReg = 0; }
 				DisplayRegim(nrReg);
 				DisplayFrequency(f);
 				sleepTime = now;
