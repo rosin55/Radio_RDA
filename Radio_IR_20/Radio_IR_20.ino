@@ -1,7 +1,7 @@
 //  Версия с 3-мя кнопками, 3-мя режимами
 //  очистка дисплея через 3-и мин.
 //  Дополнительно ИК упрравление с пульта Car MP3
-#define ver   "2020.04.11" 
+#define ver   "2020.04.12" 
 
 /* Добавляем управление с кнопок от AG
 	Подключение дисплея SSD1306 I2C:
@@ -54,8 +54,10 @@ uint8_t nrReg = 0; 	// 0 - ручная настройка, 1 - предуста
 										// 2 - изменение громкости, 3 - сон
 uint8_t napravlenie = 1; //1 - вверх, -1 - вниз  
 int RECV_PIN = 9;     //  пин ИК приёмника
-int BLINK_PIN = 13;		// индикация приёма коменд от пульта 
+int BLINK_PIN = 13;		// индикация приёма команд от пульта 
 bool flSleep = false; // состояние сна
+bool flBassBoost = false; // подъём басов
+bool flMute = false; 			// выключение звука
 
 SSD1306AsciiAvrI2c oled; // класс дисплея
 RDA5807M radio;    // Создаем класс для  RDA5807 chip radio
@@ -109,6 +111,8 @@ void RDS_process(uint16_t block1, uint16_t block2, uint16_t block3, uint16_t blo
 void ReadIR(){
 	if ( irrecv.decode(&results)) {
 		Serial.println(results.value, HEX);
+		if( results.value == knBassBoost) {radio.setBassBoost( flBassBoost ); flBassBoost = not(flBassBoost); }
+		if( results.value == knMute) {radio.setMute( flMute ); flMute = not(flMute);}
 		if ( results.value == knPlus ) { ExecCommand(1); }
 		if ( results.value == knMinus) { ExecCommand(-1);}
 		if ( results.value == knEQ) {
@@ -285,13 +289,13 @@ void setup() {
 void loop() {
 	now = millis();
 
-	ReadIR();	// ролучение и выполненеие ИК команд
-	if ((nrReg != 3) and (nrReg != 2)) radio.checkRDS(); // для всех кроме сна и громкости check for RDS data
+	ReadIR();	// получение и выполненеие ИК команд
+	if ((nrReg != 2) and (not(flSleep)) ) radio.checkRDS(); // для всех кроме громкости проверить данные RDS
 
 	knUp.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
 	knDown.tick();
 	knMode.tick();
-	if (((now - sleepTime) > timeOut) and (nrReg != 3)){ // гашение дисплея и запоминание параметров
+	if (((now - sleepTime) > timeOut) and ( not(flSleep) )){ // гашение дисплея и запоминание параметров
 		oled.clear();
 		eeprom_update_word(&StartFrequency, lastf ); // запоминаем посл. частоту
 		eeprom_update_byte(&StartVolume, volume);    // запомнить громкость
@@ -331,7 +335,7 @@ void loop() {
 			} // if
 			radio.getRadioInfo(&StateInfo); // читает параметры приема станции
 			r = StateInfo.rssi; // текущий уровень приёма
-			if ((r != lastrssi) and (nrReg != 3)) {
+			if ((r != lastrssi) and (not(flSleep))) {
 				DisplayState(); // вывод уровня приёма если изменился и нет сна
 				lastrssi = r;
 			} // if
