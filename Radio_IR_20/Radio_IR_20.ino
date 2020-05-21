@@ -1,7 +1,7 @@
 //  Версия с 3-мя кнопками, 3-мя режимами
 //  очистка дисплея через 3-и мин.
 //  Дополнительно ИК упрравление с пульта Car MP3
-#define ver   "2020.04.12" 
+#define ver   "2020.05.19" 
 
 /* Добавляем управление с кнопок от AG
 	Подключение дисплея SSD1306 I2C:
@@ -33,7 +33,10 @@
 #include <avr/eeprom.h>   // параметры хранятся в эн.незав. памяти
 
 #define I2C_ADDRESS 0X3C //0x3C адрес дисплея на шине I2C
-#define rstPin 8 // пин RST дисплея
+#define RST_PIN 8 // пин RST дисплея
+#define RECV_PIN 9     //  пин ИК приёмника
+#define BLINKLED 7		// индикация приёма команд от пульта 
+
 unsigned long now = 0; // текущее время 
 unsigned long nextFreqTime = 1000; // интервал вывода частоты
 unsigned long sleepTime = 0; //  время без нажатия кнопок 
@@ -53,8 +56,6 @@ uint8_t lastrssi;  // последнее значение уровня сигн�
 uint8_t nrReg = 0; 	// 0 - ручная настройка, 1 - предустановленные частоты
 										// 2 - изменение громкости, 3 - сон
 uint8_t napravlenie = 1; //1 - вверх, -1 - вниз  
-int RECV_PIN = 9;     //  пин ИК приёмника
-int BLINK_PIN = 13;		// индикация приёма команд от пульта 
 bool flSleep = false; // состояние сна
 bool flBassBoost = false; // подъём басов
 bool flMute = false; 			// выключение звука
@@ -67,7 +68,7 @@ GButton knUp(BTN_PIN_UP);
 GButton knDown(BTN_PIN_DOWN);
 GButton knMode(BTN_PIN_MODE);
 
-IRrecv irrecv(RECV_PIN, BLINK_PIN);
+IRrecv irrecv(RECV_PIN, BLINKLED);
 decode_results results;
 
 const RADIO_FREQ preset[] PROGMEM = {
@@ -111,17 +112,17 @@ void RDS_process(uint16_t block1, uint16_t block2, uint16_t block3, uint16_t blo
 void ReadIR(){
 	if ( irrecv.decode(&results)) {
 		Serial.println(results.value, HEX);
-		if( results.value == knBassBoost) {radio.setBassBoost( flBassBoost ); flBassBoost = not(flBassBoost); }
-		if( results.value == knMute) {radio.setMute( flMute ); flMute = not(flMute);}
 		if ( results.value == knPlus ) { ExecCommand(1); }
 		if ( results.value == knMinus) { ExecCommand(-1);}
+		if( results.value == knBassBoost) {radio.setMono(false); radio.setBassBoost(!radio.getBassBoost());}
+		if( results.value == knMute) {radio.setMono(false); radio.setMute(!radio.getMute());} // setMono снимает флаг перестройки частоты
 		if ( results.value == knEQ) {
 			sleepTime = now;
 			if (flSleep) {
 				RestoreParam();
 				DisplayFrequency(f);
 				DisplayRegim(nrReg);
-				flSleep = false;					// выход изи состояния сна
+				flSleep = false;					// выход из состояния сна
 			}
 			else{
 				nrReg = nrReg + 1;
@@ -198,12 +199,14 @@ void ExecCommand(uint8_t comm)
 			case 0: {        // плавная настройка
 				if (comm == 1) {
 					radio.seekUp(true);
-					do { radio.getRadioInfo(&StateInfo); }//Serial.println("Ищу вверх");}
+					do { radio.getRadioInfo(&StateInfo); radio.debugRadioInfo(); } //Serial.println(StateInfo.tuned);}
     			while ((!StateInfo.tuned)); //&& (startSeek + 300 > millis()));
+//    			radio.seekUp(false); radio.debugRadioInfo(); 
 				}
 				else radio.seekDown(true);{
 				  do { radio.getRadioInfo(&StateInfo); }//Serial.println("Ищу вверх");}
     			while ((!StateInfo.tuned)); //&& (startSeek + 300 > millis()));
+//    			radio.seekDown(false);
     		} 
 			}      
 				break;
@@ -260,10 +263,11 @@ void RestoreParam(){
 //####################################################################################
 
 void setup() {
-	pinMode(rstPin, OUTPUT);
 	Serial.begin(9600);
-	irrecv.enableIRIn(); // запускаем приём 
-	oled.reset(rstPin);
+	pinMode(RST_PIN, OUTPUT);
+	irrecv.blink13(1); 		// разрешение индикации приёма ИК на внешнем СД   	
+	irrecv.enableIRIn(); 	// запускаем приём ИК
+	oled.reset(RST_PIN);
 	oled.begin(&Adafruit128x64, I2C_ADDRESS);
 	oled.setFont(Verdana12);  //  Verdana12
 	oled.setContrast(0);  
