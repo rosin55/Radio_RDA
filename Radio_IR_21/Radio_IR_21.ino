@@ -1,3 +1,5 @@
+#include <GyverButton.h>
+
 #include <SSD1306Ascii.h>
 #include <SSD1306AsciiAvrI2c.h>
 #include <SSD1306AsciiSoftSpi.h>
@@ -8,7 +10,7 @@
 //  Версия с 3-мя кнопками, 3-мя режимами
 //  очистка дисплея через 3-и мин.
 //  Дополнительно ИК упрравление с пульта Car MP3
-#define ver   "2020.05.19" 
+#define ver   "2021.06.01" 
 
 /* Добавляем управление с кнопок от AG
 	Подключение дисплея SSD1306 I2C:
@@ -38,6 +40,8 @@
 
 #include <avr/pgmspace.h> // константы хранятся в прогр. памяти
 #include <avr/eeprom.h>   // параметры хранятся в эн.незав. памяти
+
+#include "Constants.h"
 
 #define I2C_ADDRESS 0X3C //0x3C адрес дисплея на шине I2C
 #define RST_PIN 8 // пин RST дисплея
@@ -78,25 +82,6 @@ GButton knMode(BTN_PIN_MODE);
 IRrecv irrecv(RECV_PIN, BLINKLED);
 decode_results results;
 
-const RADIO_FREQ preset[] PROGMEM = {
-	8750, // Бизнес FM
-	8830,	// Ретро ФМ
-	8910, // Радио Джаз
-	9030, // Авторадио
-	9080, // Релакс FM
-	9120, // Эхо Москвы
-	9240, // Радио Дача
-	9560, // Радио Звезда
-	9600, // Дорожное Радио 
-	9640, // Такси FM
-	10340, // Радио Маяк
-	10500, // Радио книга
-	10470, // Радио 7
-	10740  // Хит FM
-};
-const String regName[] = {
-	"T U N E", "P R E S E T", "V O L U M E"
-};
 int  i_sidx = 11; // Стартуем со станции с indexa
 int DlinaSpiska = (sizeof(preset) / sizeof(RADIO_FREQ)) - 1;// длина списка станций
 // Вывод частоты настройки на дисплей.
@@ -106,7 +91,7 @@ void DisplayFrequency(RADIO_FREQ f)
 	radio.formatFrequency(s, sizeof(s));
 	oled.set1X(); 
 	oled.setCursor(0,0);
-	oled.println("F R E Q U E N C Y   ");
+	oled.print("F R E Q U E N C Y"); oled.clearToEOL(); oled.println();
 	oled.set2X();
 	oled.print(s); oled.clearToEOL();
 } // DisplayFrequency()
@@ -188,6 +173,7 @@ void DisplayIntro() {
 void DisplayVolume() {
 	String bar  = "----------------";
 	int i =0;
+	oled.set1X();
 	oled.setCursor(0,0); oled.clearToEOL();
 	oled.setFont(X11fixed7x14);
 	for (i; i<volume; i++){
