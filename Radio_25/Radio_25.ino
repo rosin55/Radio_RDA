@@ -7,10 +7,12 @@
 #include <SSD1306AsciiWire.h>
 #include <SSD1306init.h>
 
+//  Второй экземпляр приёмника.
 //  Версия с 3-мя кнопками, 3-мя режимами
 //  очистка дисплея через 3-и мин.
-//  Дополнительно ИК упрравление с пульта Car MP3
-#define ver   "2021.06.01" 
+//  ИК упрравления нет
+//  Второй экземпляр приёмника.
+#define ver   "2025.01.01" 
 
 /* Добавляем управление с кнопок от AG
 	Подключение дисплея SSD1306 I2C:
@@ -34,9 +36,6 @@
 #include <radio.h>
 #include <RDA5807M.h>
 #include <RDSParser.h>
-
-#include <IRremote.h> // библиотека ИК приёмника
-#include "Key_CarMp3.h"     // Коды кнопок пульта от роботелеги
 
 #include <avr/pgmspace.h> // константы хранятся в прогр. памяти
 #include <avr/eeprom.h>   // параметры хранятся в эн.незав. памяти
@@ -79,9 +78,6 @@ GButton knUp(BTN_PIN_UP);
 GButton knDown(BTN_PIN_DOWN);
 GButton knMode(BTN_PIN_MODE);
 
-IRrecv irrecv(RECV_PIN, BLINKLED);
-decode_results results;
-
 int  i_sidx = 11; // Стартуем со станции с indexa
 int DlinaSpiska = (sizeof(preset) / sizeof(RADIO_FREQ)) - 1;// длина списка станций
 // Вывод частоты настройки на дисплей.
@@ -99,33 +95,6 @@ void DisplayFrequency(RADIO_FREQ f)
 void RDS_process(uint16_t block1, uint16_t block2, uint16_t block3, uint16_t block4) {
 	rds.processData(block1, block2, block3, block4);
 } // RDS_process
-
-
-void ReadIR(){
-	if ( irrecv.decode(&results)) {
-		Serial.println(results.value, HEX);
-		if ( results.value == knPlus ) { ExecCommand(1); }
-		if ( results.value == knMinus) { ExecCommand(-1);}
-		if( results.value == knBassBoost) {radio.setMono(false); radio.setBassBoost(!radio.getBassBoost());}
-		if( results.value == knMute) {radio.setMono(false); radio.setMute(!radio.getMute());} // setMono снимает флаг перестройки частоты
-		if ( results.value == knEQ) {
-			sleepTime = now;
-			if (flSleep) {
-				RestoreParam();
-				DisplayFrequency(f);
-				DisplayRegim(nrReg);
-				flSleep = false;					// выход из состояния сна
-			}
-			else{
-				nrReg = nrReg + 1;
-				if(nrReg == 3) { nrReg = 0; }
-				DisplayRegim(nrReg);
-			} 
-		}
-		delay(500);
-		irrecv.resume(); // получить следующее значение
-	}
-} // end ReadIR
 
 /// Update the ServiceName text on the display.
 void DisplayServiceName(char *name)
@@ -258,8 +227,6 @@ void RestoreParam(){
 void setup() {
 	Serial.begin(9600);
 	pinMode(RST_PIN, OUTPUT);
-	irrecv.blink13(1); 		// разрешение индикации приёма ИК на внешнем СД   	
-	irrecv.enableIRIn(); 	// запускаем приём ИК
 	oled.reset(RST_PIN);
 	oled.begin(&Adafruit128x64, I2C_ADDRESS);
 	oled.setFont(Verdana12);  //  Verdana12
@@ -285,9 +252,6 @@ void setup() {
 //####################################################################################
 void loop() {
 	now = millis();
-
-	ReadIR();	// получение и выполненеие ИК команд
-	if ((nrReg != 2) and (not(flSleep)) ) radio.checkRDS(); // для всех кроме громкости проверить данные RDS
 
 	knUp.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
 	knDown.tick();
