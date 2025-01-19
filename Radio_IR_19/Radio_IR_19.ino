@@ -19,7 +19,7 @@
 #include <avr/EEPROM.h> // для хранения параметров
 
 #include <IRremote.h> // библиотека ИК приёмника
-#include <Keys.h>     // Коды кнопок пульта от видеокамеры
+#include "Keys.h"     // Коды кнопок пульта от видеокамеры
 
 #include <SPI.h>
 #include <Wire.h>
@@ -191,7 +191,7 @@ void setup() {
   //irrecv.enableIRIn(); // включить приемник
 
  // initialize with the I2C addr 0x3C (for the 128x32)
-  oled.begin(&Adafruit128x32, I2C_ADDRESS); 
+  oled.begin(&Adafruit128x64, I2C_ADDRESS); 
   oled.setFont(SystemFont5x7);
 
   delay(100);
@@ -222,7 +222,7 @@ void setup() {
   radio.setVolume(VolumeLast); // начальная громкость
   // setup the information chain for RDS data.
   radio.attachReceiveRDS(RDS_process);
-  rds.attachServicenNameCallback(DisplayServiceName);
+  rds.attachServiceNameCallback(DisplayServiceName);
 } // End Setup
 
 void BtnRead(){

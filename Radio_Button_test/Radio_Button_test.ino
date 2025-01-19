@@ -87,12 +87,13 @@ void setup()
   pinMode(ledPin, OUTPUT);
 
   // open the Serial port
-  Serial.begin(9600);
+  Serial.begin(57600);
   Serial.println("Radio...");
   delay(500);
 
   // Initialize the Radio 
-  radio.init();
+//  radio.init();
+  Serial.println("Init OK");
   f = radio.getFrequency();
   Serial.println(f);
   // Enable information to the Serial port
@@ -109,8 +110,7 @@ void setup()
   radio.setVolume(5);
   // setup the information chain for RDS data.
   radio.attachReceiveRDS(RDS_process);
-  rds.attachServicenNameCallback(DisplayServiceName);
-	
+  rds.attachServiceNameCallback(DisplayServiceName);	
 }
 
 void loop()

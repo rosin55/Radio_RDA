@@ -1,12 +1,3 @@
-#include <GyverButton.h>
-
-#include <SSD1306Ascii.h>
-#include <SSD1306AsciiAvrI2c.h>
-#include <SSD1306AsciiSoftSpi.h>
-#include <SSD1306AsciiSpi.h>
-#include <SSD1306AsciiWire.h>
-#include <SSD1306init.h>
-
 //  Второй экземпляр приёмника.
 //  Версия с 3-мя кнопками, 3-мя режимами
 //  очистка дисплея через 3-и мин.
@@ -31,8 +22,11 @@
 
 #include <GyverButton.h> // Библиотека работы с кнопками от Гайвера
 
+//#include <Wire.h>
 #include "SSD1306Ascii.h"
 #include <SSD1306AsciiAvrI2c.h>
+#define I2C_ADDRESS 0x3C
+
 #include <radio.h>
 #include <RDA5807M.h>
 #include <RDSParser.h>
@@ -42,10 +36,7 @@
 
 #include "Constants.h"
 
-#define I2C_ADDRESS 0X3C //0x3C адрес дисплея на шине I2C
 #define RST_PIN 8 // пин RST дисплея
-#define RECV_PIN 9     //  пин ИК приёмника
-#define BLINKLED 7		// индикация приёма команд от пульта 
 
 unsigned long now = 0; // текущее время 
 unsigned long nextFreqTime = 1000; // интервал вывода частоты
@@ -131,7 +122,7 @@ void DisplayIntro() {
 	oled.set1X();
 	oled.setFont(Verdana12);
 	oled.print("Ver : "); oled.print(ver);
-	oled.setFont(Roosewood26);
+//	oled.setFont(Roosewood26);
 	oled.setCursor(0,2);
 	oled.print("RDA5807M");
 	delay(2000);
@@ -230,11 +221,10 @@ void setup() {
 	oled.reset(RST_PIN);
 	oled.begin(&Adafruit128x64, I2C_ADDRESS);
 	oled.setFont(Verdana12);  //  Verdana12
-	oled.setContrast(0);  
 	oled.clear();
 	DisplayIntro();
-
-	radio.init();
+  radio.init();
+  if (!radio.initWire(Wire)) Serial.println("радио нет");
 	radio.debugEnable();
 	i_sidx = eeprom_read_byte(&Starti_sidx);
 	nrReg = eeprom_read_byte(&StartnrReg);
